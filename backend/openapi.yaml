@@ -1,0 +1,280 @@
+openapi: 3.0.3
+info:
+  title: ELE-IWS-521 React Blog API
+  version: 1.0.0
+  description: |
+    REST API for the blog (Backend Lead: Olinda, Frontend: Ben).
+    Auth: send `Authorization: Bearer <token>` (token from /auth/register or /auth/login).
+    Errors are always `{ "error": "message", "details"?: {...} }`.
+    Roles: reader < author < admin. New users are `reader`; an admin promotes authors.
+servers:
+  - url: http://localhost:4000/api/v1
+    description: Local
+  - url: https://YOUR-APP.onrender.com/api/v1
+    description: Deployed (update after deploy)
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  schemas:
+    Error:
+      type: object
+      properties: { error: { type: string }, details: { type: object } }
+    User:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string, format: email }
+        role: { type: string, enum: [reader, author, admin] }
+    AuthResponse:
+      type: object
+      properties: { user: { $ref: '#/components/schemas/User' }, token: { type: string } }
+    Tag:
+      type: object
+      properties: { id: { type: integer }, name: { type: string }, slug: { type: string } }
+    Post:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        slug: { type: string }
+        body_markdown: { type: string }
+        cover_image_url: { type: string, nullable: true, description: "Relative path e.g. /uploads/abc.png - prefix with API origin" }
+        status: { type: string, enum: [draft, published] }
+        views_count: { type: integer }
+        likes_count: { type: integer }
+        comments_count: { type: integer }
+        author_id: { type: integer }
+        author_name: { type: string }
+        created_at: { type: string, format: date-time }
+        tags: { type: array, items: { $ref: '#/components/schemas/Tag' } }
+        liked_by_me: { type: boolean, description: "Only present when a valid token is sent (single-post fetch)" }
+    Comment:
+      type: object
+      properties:
+        id: { type: integer }
+        post_id: { type: integer }
+        user_id: { type: integer }
+        user_name: { type: string }
+        parent_id: { type: integer, nullable: true }
+        content: { type: string }
+        is_moderated: { type: boolean }
+        created_at: { type: string, format: date-time }
+        replies: { type: array, description: "Only when ?tree=true", items: { type: object } }
+    PostForm:
+      type: object
+      description: Send as multipart/form-data when uploading a cover image, otherwise JSON also works.
+      properties:
+        title: { type: string, minLength: 3, maxLength: 200 }
+        body_markdown: { type: string }
+        status: { type: string, enum: [draft, published], default: draft }
+        tags: { type: string, description: 'JSON array string ["Tech","Education"] or comma separated' }
+        cover_image: { type: string, format: binary, description: png/jpg/webp/gif, max 2MB }
+  responses:
+    Unauthorized: { description: Missing/invalid token, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Forbidden: { description: Role or ownership check failed, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    NotFound: { description: Not found, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Validation: { description: Validation failed, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+security: []
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register (role forced to reader)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name: { type: string }
+                email: { type: string }
+                password: { type: string, minLength: 8 }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/AuthResponse' } } } }
+        '400': { $ref: '#/components/responses/Validation' }
+        '409': { description: Email already registered }
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login (rate limited 5/min per IP)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties: { email: { type: string }, password: { type: string } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/AuthResponse' } } } }
+        '401': { description: Invalid email or password }
+        '429': { description: Too many attempts }
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Current user (use to restore session on page load)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { user: { $ref: '#/components/schemas/User' } } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /users/{id}/role:
+    patch:
+      tags: [Admin]
+      summary: Change a user's role (admin only)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [role], properties: { role: { type: string, enum: [reader, author, admin] } } } } }
+      responses:
+        '200': { description: Updated user }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /posts:
+    get:
+      tags: [Posts]
+      summary: Paginated feed of published posts
+      parameters:
+        - { name: search, in: query, schema: { type: string }, description: Matches title or body }
+        - { name: tag, in: query, schema: { type: string }, description: Tag slug e.g. fintech }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, default: 10, maximum: 50 } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/Post' } }
+                  pagination:
+                    type: object
+                    properties: { page: { type: integer }, limit: { type: integer }, total: { type: integer }, totalPages: { type: integer } }
+    post:
+      tags: [Posts]
+      summary: Create post (author, admin)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data: { schema: { $ref: '#/components/schemas/PostForm' } }
+          application/json: { schema: { $ref: '#/components/schemas/PostForm' } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { type: object, properties: { post: { $ref: '#/components/schemas/Post' } } } } } }
+        '400': { $ref: '#/components/responses/Validation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /posts/{slug}:
+    get:
+      tags: [Posts]
+      summary: Single post by slug (increments views; drafts only visible to owner/admin)
+      description: Send the token (optional) to receive `liked_by_me`.
+      parameters: [{ name: slug, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { post: { $ref: '#/components/schemas/Post' } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /posts/{id}:
+    put:
+      tags: [Posts]
+      summary: Update post (owner or admin). All fields optional.
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        content:
+          multipart/form-data: { schema: { $ref: '#/components/schemas/PostForm' } }
+          application/json: { schema: { $ref: '#/components/schemas/PostForm' } }
+      responses:
+        '200': { description: Updated }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Posts]
+      summary: Delete post + cascade comments/likes (owner or admin)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '204': { description: Deleted }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /posts/{id}/comments:
+    get:
+      tags: [Comments]
+      summary: List comments for a published post (added for the frontend)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: tree, in: query, schema: { type: boolean }, description: "true = nested via `replies`" }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/Comment' } } } } } } }
+    post:
+      tags: [Comments]
+      summary: Add a comment or reply (any logged-in user)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string, maxLength: 2000 }
+                parent_id: { type: integer, nullable: true }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { type: object, properties: { comment: { $ref: '#/components/schemas/Comment' } } } } } }
+        '400': { $ref: '#/components/responses/Validation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /posts/{id}/like:
+    post:
+      tags: [Likes]
+      summary: Toggle like
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, properties: { liked: { type: boolean }, likes_count: { type: integer } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /author/stats:
+    get:
+      tags: [Author]
+      summary: Dashboard metrics for the logged-in author (admin may pass ?author_id=)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_posts: { type: integer }
+                  total_views: { type: integer }
+                  total_likes: { type: integer }
+                  total_comments: { type: integer }
+                  posts:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        title: { type: string }
+                        slug: { type: string }
+                        status: { type: string }
+                        views_count: { type: integer }
+                        likes_count: { type: integer }
+                        comments_count: { type: integer }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /author/posts:
+    get:
+      tags: [Author]
+      summary: Own posts including drafts (for the editor/dashboard list)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
