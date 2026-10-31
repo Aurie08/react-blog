@@ -10,7 +10,7 @@ info:
 servers:
   - url: http://localhost:4000/api/v1
     description: Local
-  - url: https://YOUR-APP.onrender.com/api/v1
+  - url: https://https://blog-api-lkzn.onrender.com
     description: Deployed (update after deploy)
 components:
   securitySchemes:
