@@ -1,21 +1,26 @@
 import { Routes, Route } from 'react-router-dom';
+import Navbar from './components/layout/Navbar';
+import Login from './pages/Login';
+import Register from './pages/Register';
 
-// Temporary placeholder components (we will build these in separate files soon)
-const Home = () => <div className="p-8 text-2xl font-bold">Public Feed</div>;
-const Login = () => <div className="p-8 text-2xl font-bold">Login Page</div>;
+// Temporary placeholder
+const Home = () => <div className="p-8 max-w-6xl mx-auto"><h1 className="text-3xl font-bold">Public Feed Coming Soon</h1></div>;
 
 function App() {
   return (
-    // 'min-h-screen bg-gray-50' is Tailwind utility classes for a full-height app with a light gray background
-    <div className="min-h-screen bg-gray-50 text-gray-900">
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        
-        {/* 404 Route (Catch-all) */}
-        <Route path="*" element={<div className="p-8 text-center">404 - Page Not Found</div>} />
-      </Routes>
+    <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col">
+      {/* The Navbar sits at the top of every page */}
+      <Navbar />
+      
+      {/* The main content area */}
+      <main className="flex-grow">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="*" element={<div className="p-8 text-center text-2xl font-bold text-red-500">404 - Page Not Found</div>} />
+        </Routes>
+      </main>
     </div>
   );
 }
