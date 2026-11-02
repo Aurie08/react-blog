@@ -55,8 +55,13 @@ const Navbar = () => {
                     <span className="text-sm font-bold text-gray-800">{user.name}</span>
                     <span className="text-xs text-gray-500 capitalize">{user.role}</span>
                   </div>
-                  <button onClick={handleLogout} className="text-gray-500 hover:text-red-600 p-2" title="Logout">
-                    <LogOut size={20} />
+                  <button 
+                    onClick={handleLogout} 
+                    className="group flex items-center gap-1 text-gray-500 hover:text-red-600 transition-colors p-2 font-medium" 
+                    title="Logout"
+                  >
+                    <LogOut size={20} className="group-hover:text-red-600 transition-colors" /> 
+                    <span>Logout</span>
                   </button>
                 </div>
               </>
