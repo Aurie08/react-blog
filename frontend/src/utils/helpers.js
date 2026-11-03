@@ -10,7 +10,7 @@ export const getImageUrl = (url) => {
   if (url.startsWith('http')) {
     return url;
   }
-  // Otherwise, prepend the API origin
+  // Otherwise, prepend the API origin (which is now just the root domain)
   return `${API_ORIGIN}${url}`;
 };
 
