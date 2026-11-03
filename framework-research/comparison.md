@@ -1,6 +1,6 @@
 # Framework & Library Comparison Matrix
 
-## 1. Summary Comparison Table
+## Summary Comparison Table
 
 | Feature / Criteria | **React** | **Vue.js** | **Angular** | **Next.js** |
 | :--- | :--- | :--- | :--- | :--- |
