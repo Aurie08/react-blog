@@ -1,1 +1,32 @@
+
 @import "tailwindcss";
+
+/* Global page styling */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    background-color: #f8f8f5;
+    color: #202820;
+    font-family: Arial, Helvetica, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button,
+  input,
+  textarea {
+    font: inherit;
+  }
+
+  a {
+    text-decoration: none;
+  }
+
+  ::selection {
+    background-color: #dce9df;
+    color: #183c2a;
+  }
+}
