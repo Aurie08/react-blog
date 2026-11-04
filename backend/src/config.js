@@ -6,7 +6,13 @@ const config = {
   databaseSsl: process.env.DATABASE_SSL === 'true',
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '1h',
-  corsOrigin: process.env.CORS_ORIGIN || '*',
+ corsOrigin: (() => {
+  const value = process.env.CORS_ORIGIN || '*';
+
+  if (value === '*') return '*';
+
+  return value.split(',').map(origin => origin.trim());
+})(),
   bcryptRounds: 10,
 };
 
