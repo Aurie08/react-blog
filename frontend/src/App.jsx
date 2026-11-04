@@ -6,7 +6,8 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import PostDetails from './pages/PostDetails';
 import PostEditor from './pages/PostEditor';
-import Dashboard from './pages/Dashboard'; 
+import Dashboard from './pages/Dashboard';
+import Admin from './pages/Admin'; // <-- Add this import
 
 function App() {
   return (
@@ -20,10 +21,16 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/posts/:slug" element={<PostDetails />} />
 
-          {/* Protected Routes (Authors and Admins only) */}
+          {/* Protected Routes (Authors and Admins) */}
           <Route element={<ProtectedRoute allowedRoles={['author', 'admin']} />}>
-            <Route path="/posts/new" element={<PostEditor />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/posts/new" element={<PostEditor />} />
+            <Route path="/posts/:id/edit" element={<PostEditor />} /> {/* <-- Reusing PostEditor! */}
+          </Route>
+
+          {/* Admin Only Route */}
+          <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+            <Route path="/admin" element={<Admin />} /> {/* <-- Add this route */}
           </Route>
 
           <Route path="*" element={<div className="p-8 text-center text-2xl font-bold text-red-500">404 - Page Not Found</div>} />

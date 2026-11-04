@@ -133,7 +133,7 @@ const Dashboard = () => {
                     <td className="px-6 py-4 text-center text-gray-600 font-medium">{post.comments_count}</td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">
-                        <Link to={`/posts/${post.id}/edit`} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
+                        <Link to={`/posts/${post.id}/edit?slug=${post.slug}`} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
                           <Edit size={18} />
                         </Link>
                         <button onClick={() => handleDelete(post.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
