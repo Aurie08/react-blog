@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 import { formatDate } from '../utils/helpers';
 import { ShieldAlert, Trash2, Eye } from 'lucide-react';
-
+   import UserRoles from '../components/admin/UserRoles';
 const Admin = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -94,6 +94,7 @@ const Admin = () => {
           </table>
         </div>
       </div>
+      <UserRoles />
     </div>
   );
 };
