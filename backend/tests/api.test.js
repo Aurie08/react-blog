@@ -79,6 +79,20 @@ describe('Auth', () => {
   });
 });
 
+describe('CORS', () => {
+  test('allowlist reflects a single matching origin and omits others', async () => {
+    process.env.CORS_ORIGIN = 'http://localhost:5173, https://site.example/';
+    jest.resetModules();
+    const listApp = require('../src/app')({ loginMax: 1000 });
+    const ok = await request(listApp).options('/api/v1/auth/login')
+      .set('Origin', 'http://localhost:5173').set('Access-Control-Request-Method', 'POST');
+    expect(ok.headers['access-control-allow-origin']).toBe('http://localhost:5173');
+    const bad = await request(listApp).get('/api/v1/health').set('Origin', 'http://evil.example');
+    expect(bad.headers['access-control-allow-origin']).toBeUndefined();
+    delete process.env.CORS_ORIGIN;
+  });
+});
+
 describe('RBAC & posts', () => {
   test('reader cannot create posts (403), anonymous gets 401', async () => {
     const body = { title: 'Nope nope', body_markdown: 'x' };
@@ -142,6 +156,18 @@ describe('RBAC & posts', () => {
     await sleep(150);
     const second = await request(app).get(`/api/v1/posts/${p.slug}`);
     expect(second.body.post.views_count).toBe(1);
+  });
+
+  test('cover image without a file extension is stored with the right one and served as an image', async () => {
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+    const res = await request(app).post('/api/v1/posts').set(auth(author))
+      .field('title', 'Blob cover').field('body_markdown', 'pic').field('status', 'published')
+      .attach('cover_image', png, { filename: 'blob', contentType: 'image/png' });
+    expect(res.status).toBe(201);
+    expect(res.body.post.cover_image_url).toMatch(/\.png$/);
+    const file = await request(app).get(res.body.post.cover_image_url);
+    expect(file.headers['content-type']).toMatch(/image\/png/);
+    fs.unlinkSync(path.join(__dirname, '..', res.body.post.cover_image_url));
   });
 
   test('cover image upload works and non-images are rejected', async () => {
@@ -228,12 +254,23 @@ describe('Comments, likes, stats, cascade', () => {
     expect(counts.rows[0]).toEqual({ c: 0, l: 0, t: 0 });
   });
 
-  test('only admins can change roles', async () => {
+  test('only admins can list users or change roles; own role is protected', async () => {
+    // listing
+    expect((await request(app).get('/api/v1/users')).status).toBe(401);
+    expect((await request(app).get('/api/v1/users').set(auth(author))).status).toBe(403);
+    const list = await request(app).get('/api/v1/users?search=reader').set(auth(admin));
+    expect(list.status).toBe(200);
+    expect(list.body.data.map((u) => u.email)).toContain('reader@test.mw');
+    expect(list.body.data[0]).not.toHaveProperty('password_hash');
+    expect((await request(app).get('/api/v1/users?role=wizard').set(auth(admin))).status).toBe(400);
+    // role change
     const url = `/api/v1/users/${reader.id}/role`;
     expect((await request(app).patch(url).set(auth(author)).send({ role: 'admin' })).status).toBe(403);
     expect((await request(app).patch(url).set(auth(admin)).send({ role: 'wizard' })).status).toBe(400);
     const ok = await request(app).patch(url).set(auth(admin)).send({ role: 'author' });
     expect(ok.body.user.role).toBe('author');
+    const self = await request(app).patch(`/api/v1/users/${admin.id}/role`).set(auth(admin)).send({ role: 'reader' });
+    expect(self.status).toBe(400);
     await db.query("UPDATE users SET role='reader' WHERE id=$1", [reader.id]);
   });
 });
