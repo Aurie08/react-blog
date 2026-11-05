@@ -10,7 +10,12 @@ function createApp({ loginMax = 5, generalMax = 300 } = {}) {
   const app = express();
   app.set('trust proxy', 1); // behind Render/Railway proxy -> correct client IP for rate limiting
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } })); // allow frontend <img>
-  app.use(cors({ origin: config.corsOrigin }));
+  // CORS_ORIGIN may be '*' or a comma-separated allowlist ("http://localhost:5173,https://my-site.com").
+  // For a list we reflect ONLY the matching origin, so the header always has exactly one value.
+  const allowed = config.corsOrigin.split(',').map((o) => o.trim().replace(/\/$/, '')).filter(Boolean);
+  const corsOrigin = allowed.includes('*') ? '*'
+    : (origin, cb) => cb(null, !origin || allowed.includes(origin));
+  app.use(cors({ origin: corsOrigin }));
   app.use(express.json({ limit: '100kb' }));
   app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
   app.use('/api', generalLimiter(generalMax));
