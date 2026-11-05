@@ -3,10 +3,14 @@ const path = require('path');
 const crypto = require('crypto');
 const HttpError = require('../utils/httpError');
 
+// Extension comes from the MIME type the server accepted, never from the client's filename
+// (a file named "blob" would otherwise be saved without one and served as octet-stream).
+const EXT = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/jpg': '.jpg', 'image/webp': '.webp', 'image/gif': '.gif' };
+
 const storage = multer.diskStorage({
   destination: path.join(__dirname, '..', '..', 'uploads'),
   filename: (req, file, cb) =>
-    cb(null, crypto.randomBytes(12).toString('hex') + path.extname(file.originalname).toLowerCase()),
+    cb(null, crypto.randomBytes(12).toString('hex') + EXT[file.mimetype]),
 });
 
 module.exports = multer({
